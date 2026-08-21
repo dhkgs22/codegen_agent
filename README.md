@@ -93,3 +93,7 @@ plan.md             # 项目预研文档
 - [ ] WebSocket 实时推送（目前用 SSE）
 - [ ] Bug 轮次修复数 / 成功率的 benchmark 统计
 - [ ] 支持多文件项目 + 第三方依赖安装沙箱
+
+## 📄 License
+
+本项目使用 [MIT License](LICENSE)。
