@@ -6,9 +6,9 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from ..config import settings
-from ..events import EventBus, EV_DONE, EV_FAIL, EV_LOG, EV_START
+from ..events import EventBus, EV_DONE, EV_FAIL, EV_LOG, EV_MSG, EV_START
+from ..harness import Harness
 from ..llm import LLMClient
-from ..sandbox import Sandbox
 from .code_agent import CodeAgent
 from .debug_agent import DebugAgent, parse_traceback
 from .doc_agent import DocAgent
@@ -30,6 +30,7 @@ class PipelineResult:
     final_output: str = ""
     tests_passed: bool | None = None
     tests_summary: str = ""
+    test_rounds_used: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -46,6 +47,7 @@ class PipelineResult:
             "final_output": self.final_output,
             "tests_passed": self.tests_passed,
             "tests_summary": self.tests_summary,
+            "test_rounds_used": self.test_rounds_used,
         }
 
 
@@ -61,18 +63,24 @@ class Coordinator:
         sandbox_timeout: float | None = None,
         keep_workspace: bool = False,
         enable_tests: bool | None = None,
+        max_test_rounds: int | None = None,
     ) -> None:
         self.llm = llm
         self.bus = bus or EventBus()
         self.max_rounds = max_rounds if max_rounds is not None else settings.max_fix_rounds
-        self.sandbox = Sandbox(workspace=workspace, timeout=sandbox_timeout)
+        self.max_test_rounds = (
+            max_test_rounds if max_test_rounds is not None else settings.max_test_rounds
+        )
+        # Harness：统一基础设施（沙箱 + 事件总线 + 工具），分发给各 Agent
+        self.harness = Harness(workspace=workspace, timeout=sandbox_timeout, bus=self.bus)
+        self.sandbox = self.harness.sandbox
         self.keep_workspace = keep_workspace
         self.enable_tests = enable_tests if enable_tests is not None else settings.auto_tests
 
-        self.code_agent = CodeAgent(llm, self.bus)
-        self.debug_agent = DebugAgent(llm, self.sandbox, self.bus, self.max_rounds)
-        self.doc_agent = DocAgent(llm, self.bus)
-        self.test_agent = TestAgent(llm, self.sandbox, self.bus) if self.enable_tests else None
+        self.code_agent = CodeAgent(llm, harness=self.harness)
+        self.debug_agent = DebugAgent(llm, harness=self.harness, max_rounds=self.max_rounds)
+        self.doc_agent = DocAgent(llm, harness=self.harness)
+        self.test_agent = TestAgent(llm, harness=self.harness) if self.enable_tests else None
 
     def run(self, task: str, filename: str = "main.py") -> PipelineResult:
         """执行完整流水线，返回结果。"""
@@ -136,13 +144,49 @@ class Coordinator:
         readme = self.doc_agent.write_readme(task, code, result, filename)
         self.sandbox.write_file("README.md", readme)
 
-        # 4. Test Agent（可选）：自动生成测试并在沙箱中运行
+        # 4. Test Agent（可选）：自动生成测试并在沙箱中运行。
+        #    测试失败时通过协作消息反馈给 Debug Agent 修复并复测（Test→Debug 回环）。
         tests_passed: bool | None = None
         tests_summary = ""
+        test_rounds_used = 0
         if self.test_agent is not None:
             test_info = self.test_agent.generate_tests(task, code, filename)
+            test_rounds_used = 1
             tests_passed = test_info.get("passed")
             tests_summary = test_info.get("summary") or ""
+            # 只有真的生成了测试代码，才允许进入 Test→Debug 回环；
+            # 测试代码为空（LLM 未生成）时没有验收标准，无从修复。
+            can_loop = bool(test_info.get("tests_code"))
+            test_history: list[dict[str, Any]] = []
+            while can_loop and not tests_passed and test_rounds_used < self.max_test_rounds:
+                test_rounds_used += 1
+                # 协作消息：Test Agent 把失败反馈给 Debug Agent
+                self.bus.emit(
+                    EV_MSG,
+                    agent="TestAgent",
+                    message=f"TestAgent → DebugAgent：测试失败，请修复（协作回环第 {test_rounds_used} 轮）",
+                    data={
+                        "target": "DebugAgent",
+                        "output": (test_info.get("output") or "")[:2000],
+                    },
+                )
+                # Debug Agent 按测试失败输出修复代码
+                code = self.debug_agent.fix_tests(
+                    task,
+                    code,
+                    test_info.get("output") or test_info.get("summary") or "",
+                    filename,
+                    test_history,
+                )
+                test_history.append({"round": test_rounds_used, "summary": tests_summary})
+                # 修复后先确认程序仍能运行
+                result = self.sandbox.run_file(filename)
+                if not result.ok:
+                    break
+                # 复测：复用同一份 test_main.py 验收
+                test_info = self.test_agent.rerun()
+                tests_passed = test_info.get("passed")
+                tests_summary = test_info.get("summary") or ""
 
         files = self.sandbox.list_files()
         if not self.keep_workspace:
@@ -172,6 +216,7 @@ class Coordinator:
             final_output=result.stdout or "",
             tests_passed=tests_passed,
             tests_summary=tests_summary,
+            test_rounds_used=test_rounds_used,
         )
 
     def _fail(self, task: str, start: float, err: str) -> PipelineResult:

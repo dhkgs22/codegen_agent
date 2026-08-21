@@ -12,7 +12,9 @@
   - **结构化错误诊断**：解析 traceback 提取错误类型/行号，修复更精准
   - **修复历史记忆**：每轮失败原因累积传入，避免重复踩坑
 - **Test Agent**：运行通过后自动生成 pytest 测试并在沙箱中跑通验证
+- **Test→Debug 协作回环**：测试失败 → 协作消息反馈给 Debug → 修复 → 复用同一份测试复测
 - **Doc Agent**：运行通过后自动生成 README.md
+- **Harness 基础设施层**：统一管理沙箱 / 事件流 / 工具注册 / 配置（`app/harness.py`）
 - **LLM 抽象层**：默认 DeepSeek，接口可换 Claude（OpenAI 兼容）
 - **三种使用方式**：CLI / FastAPI+SSE / Streamlit Web
 - **Benchmark 评测**：10 个任务批量跑，输出成功率/耗时/轮次统计
@@ -77,7 +79,7 @@ python -m app.cli "写一个程序" --no-tests
 ```
 
 使用 FakeClient 模拟 LLM，覆盖：沙箱运行、代码提取、修复循环、失败终止、CLI JSON、API、
-traceback 解析、修复历史记忆、Test Agent。
+traceback 解析、修复历史记忆、Test Agent、Harness 工具注册、Test→Debug 协作回环。
 
 ## 📊 Benchmark 评测
 
@@ -100,6 +102,7 @@ app/
   config.py         # 配置
   events.py         # 事件模型 + EventBus
   llm/client.py     # LLM 抽象（DeepSeek / Fake）
+  harness.py        # Harness 基础设施层（沙箱+事件+工具+配置）
   sandbox/runner.py # 沙箱执行（隔离 + 超时）
   agents/           # Code / Debug / Doc / Test Agent + Coordinator
 benchmark/          # 评测任务集（tasks.py）+ 结果（results.md）

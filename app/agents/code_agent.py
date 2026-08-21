@@ -35,8 +35,11 @@ def extract_code(text: str) -> str:
 
 
 class CodeAgent:
-    def __init__(self, llm: LLMClient, bus: EventBus | None = None) -> None:
+    def __init__(self, llm: LLMClient, bus: EventBus | None = None, harness: Any | None = None) -> None:
+        # 优先使用 Harness 提供的基础设施（事件总线、沙箱、工具）
         self.llm = llm
+        if harness is not None:
+            bus = harness.bus
         self.bus = bus or EventBus()
 
     def generate(self, task: str, existing_files: list[str] | None = None) -> str:

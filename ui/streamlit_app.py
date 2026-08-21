@@ -31,6 +31,7 @@ KIND_EMOJI = {
     "fix": "🔧",
     "doc": "📄",
     "test": "🧪",
+    "msg": "🔁",
     "done": "✅",
     "fail": "❌",
     "error": "💥",
@@ -90,6 +91,8 @@ def main() -> None:
                             st.text(data["summary"])
                         if data.get("output"):
                             st.text(data["output"])
+                elif kind == "msg":
+                    container.markdown(f"🔁 **协作消息** {message}")
                 elif kind in ("done", "fail"):
                     container.success(message) if kind == "done" else container.error(message)
     except httpx.HTTPStatusError as e:

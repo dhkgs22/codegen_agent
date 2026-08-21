@@ -36,6 +36,10 @@ class Settings:
     auto_tests: bool = field(
         default_factory=lambda: os.getenv("AUTO_TESTS", "1").lower() not in ("0", "false", "no")
     )
+    # Test→Debug 协作回环：测试失败时反馈给 Debug Agent 修复并复测的最大轮次
+    max_test_rounds: int = field(
+        default_factory=lambda: int(os.getenv("MAX_TEST_ROUNDS", "2"))
+    )
 
 
 settings = Settings()

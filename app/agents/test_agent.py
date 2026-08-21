@@ -27,9 +27,19 @@ TEST_SYSTEM_PROMPT = """你是一名测试工程师。用户会给你一个程�
 class TestAgent:
     __test__ = False  # 避免 pytest 把该类误当测试类收集
 
-    def __init__(self, llm: LLMClient, sandbox: Sandbox, bus: EventBus | None = None) -> None:
+    def __init__(
+        self,
+        llm: LLMClient,
+        sandbox: Sandbox | None = None,
+        bus: EventBus | None = None,
+        harness: Any | None = None,
+    ) -> None:
+        # 优先使用 Harness 提供的基础设施（事件总线、沙箱、工具）
+        if harness is not None:
+            sandbox = harness.sandbox
+            bus = harness.bus
         self.llm = llm
-        self.sandbox = sandbox
+        self.sandbox = sandbox if sandbox is not None else Sandbox()
         self.bus = bus or EventBus()
 
     def generate_tests(
@@ -75,7 +85,27 @@ class TestAgent:
                 "returncode": -1,
             }
 
-        self.sandbox.write_file("test_main.py", tests)
+        return self._run_tests(tests)
+
+    def rerun(self) -> dict[str, Any]:
+        """不重新生成测试，直接重跑沙箱里已有的 test_main.py。
+
+        用于 Test→Debug 协作回环：Debug 修复代码后，用同一份测试验收。
+        """
+        return self._run_tests()
+
+    def _run_tests(self, tests: str | None = None) -> dict[str, Any]:
+        """运行沙箱中的 test_main.py 并汇总结果；tests 非空时先写入文件。"""
+        if tests is not None:
+            self.sandbox.write_file("test_main.py", tests)
+        if not (self.sandbox.workspace / "test_main.py").exists():
+            return {
+                "tests_code": "",
+                "passed": False,
+                "summary": "沙箱中没有 test_main.py，无法运行测试",
+                "output": "",
+                "returncode": -1,
+            }
         run_res = self.sandbox.run_cmd(
             [self.sandbox.python, "-m", "pytest", "test_main.py", "-q"],
             cwd=self.sandbox.workspace,
@@ -83,7 +113,13 @@ class TestAgent:
         passed = run_res.returncode == 0 and not run_res.timed_out and not run_res.error
         out = (run_res.stdout or "").strip()
         # 最后一行通常是 pytest 汇总（如 "3 passed in 0.12s"）
-        summary = out.splitlines()[-1] if out else (run_res.stderr or "").strip().splitlines()[-1] if (run_res.stderr or "").strip() else "(无输出)"
+        summary = (
+            out.splitlines()[-1]
+            if out
+            else (run_res.stderr or "").strip().splitlines()[-1]
+            if (run_res.stderr or "").strip()
+            else "(无输出)"
+        )
         self.bus.emit(
             EV_TEST,
             agent="TestAgent",
@@ -92,11 +128,11 @@ class TestAgent:
                 "passed": passed,
                 "summary": summary,
                 "output": out[:2000],
-                "tests_code": tests,
+                "tests_code": tests or "",
             },
         )
         return {
-            "tests_code": tests,
+            "tests_code": tests or "",
             "passed": passed,
             "summary": summary,
             "output": out[:2000],

@@ -1,6 +1,8 @@
 """Doc Agent：根据最终代码生成 README.md 文档。"""
 from __future__ import annotations
 
+from typing import Any
+
 from ..events import EventBus, EV_DOC, EV_LOG
 from ..llm import LLMClient
 from ..sandbox import RunResult
@@ -18,8 +20,11 @@ README 需包含：
 
 
 class DocAgent:
-    def __init__(self, llm: LLMClient, bus: EventBus | None = None) -> None:
+    def __init__(self, llm: LLMClient, bus: EventBus | None = None, harness: Any | None = None) -> None:
+        # 优先使用 Harness 提供的基础设施（事件总线、沙箱、工具）
         self.llm = llm
+        if harness is not None:
+            bus = harness.bus
         self.bus = bus or EventBus()
 
     def write_readme(

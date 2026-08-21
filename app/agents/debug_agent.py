@@ -58,12 +58,17 @@ class DebugAgent:
     def __init__(
         self,
         llm: LLMClient,
-        sandbox: Sandbox,
+        sandbox: Sandbox | None = None,
         bus: EventBus | None = None,
         max_rounds: int | None = None,
+        harness: Any | None = None,
     ) -> None:
+        # 优先使用 Harness 提供的基础设施（事件总线、沙箱、工具）
+        if harness is not None:
+            sandbox = harness.sandbox
+            bus = harness.bus
         self.llm = llm
-        self.sandbox = sandbox
+        self.sandbox = sandbox if sandbox is not None else Sandbox()
         self.bus = bus or EventBus()
         self.max_rounds = max_rounds
 
@@ -138,6 +143,65 @@ class DebugAgent:
             EV_FIX,
             agent="DebugAgent",
             message="DebugAgent 已修复代码",
+            data={"code": fixed, "raw": raw},
+        )
+        return fixed
+
+    def fix_tests(
+        self,
+        task: str,
+        code: str,
+        test_output: str,
+        filename: str = "main.py",
+        history: list[dict[str, Any]] | None = None,
+    ) -> str:
+        """根据测试失败输出（pytest）修复代码，返回修复后的代码。
+
+        与 fix() 不同：这里程序本身能运行，但输出不满足测试断言，
+        需要按测试要求修正行为逻辑。Test→Debug 协作回环会调用它。
+        """
+        history_text = ""
+        if history:
+            rows = [
+                f"- 第 {h.get('round', '?')} 轮测试失败：{(h.get('summary') or '')[:150]}"
+                for h in history
+            ]
+            history_text = (
+                "\n\n[修复历史]（前几轮测试仍未通过，请换一种思路，不要重复同样的修改）\n"
+                + "\n".join(rows)
+            )
+
+        user_prompt = f"""原始任务：
+{task}
+
+当前代码（能运行，但测试未通过）：
+```python
+{code}
+```
+
+pytest 失败输出：
+{(test_output or '(无输出)')[:3000]}
+{history_text}
+请修复代码，使所有测试断言通过。保持程序原有功能，只做必要的修改。
+请输出修复后的完整代码（```python 包裹）。"""
+        self.bus.emit(
+            EV_LOG,
+            agent="DebugAgent",
+            message="DebugAgent 根据测试失败反馈修复代码",
+            data={"test_output": test_output[:1000]},
+        )
+        raw = self.llm.chat(
+            [
+                {"role": "system", "content": DEBUG_SYSTEM_PROMPT},
+                {"role": "user", "content": user_prompt},
+            ]
+        )
+        fixed = extract_code(raw)
+        self.sandbox.write_file(filename, fixed)
+        self.bus.emit(
+            EV_FIX,
+            agent="DebugAgent",
+            message="DebugAgent 已按测试要求修复代码",
             data={"code": fixed, "raw": raw},
         )
         return fixed

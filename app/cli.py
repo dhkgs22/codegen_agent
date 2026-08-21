@@ -11,7 +11,7 @@ import json
 import sys
 
 from .agents import Coordinator
-from .events import EV_CODE, EV_DOC, EV_FAIL, EV_FIX, EV_LOG, EV_RUN, EV_START, EV_TEST
+from .events import EV_CODE, EV_DOC, EV_FAIL, EV_FIX, EV_LOG, EV_MSG, EV_RUN, EV_START, EV_TEST
 from .llm import build_client
 
 
@@ -23,6 +23,7 @@ def _print_event(kind: str, message: str, data: dict) -> None:
         EV_FIX: "[修复]",
         EV_DOC: "[文档]",
         EV_TEST: "[测试]",
+        EV_MSG: "[协作]",
         EV_FAIL: "[失败]",
         EV_LOG: "[日志]",
     }.get(kind, f"[{kind}]")
@@ -44,6 +45,8 @@ def _print_event(kind: str, message: str, data: dict) -> None:
     elif kind == EV_TEST:
         status = "✅ 通过" if data.get("passed") else "⚠️ 未通过"
         print(f"  {status}  {data.get('summary', '')}")
+    elif kind == EV_MSG:
+        print(f"  🔁 {message}")
 
 
 def main(argv: list[str] | None = None) -> int:
