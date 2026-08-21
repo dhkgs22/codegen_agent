@@ -32,6 +32,10 @@ class Settings:
     llm_timeout: float = field(
         default_factory=lambda: float(os.getenv("LLM_TIMEOUT", "120"))
     )
+    # 运行通过后是否自动生成并运行测试（Test Agent），测试失败不影响整体结果
+    auto_tests: bool = field(
+        default_factory=lambda: os.getenv("AUTO_TESTS", "1").lower() not in ("0", "false", "no")
+    )
 
 
 settings = Settings()

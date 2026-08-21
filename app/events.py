@@ -12,6 +12,7 @@ EV_CODE = "code"            # Code Agent 生成/更新了代码
 EV_RUN = "run"              # 沙箱运行结果（含 stdout/stderr/returncode）
 EV_FIX = "fix"              # Debug Agent 修复后的代码
 EV_DOC = "doc"              # Doc Agent 生成的文档
+EV_TEST = "test"            # Test Agent 生成的测试与运行结果
 EV_DONE = "done"            # 全部完成
 EV_FAIL = "fail"            # 失败终止
 EV_ERROR = "error"          # 内部错误

@@ -98,9 +98,18 @@ class Sandbox:
 
     def run_cmd(self, cmd: list[str], cwd: Path | None = None) -> RunResult:
         """通用命令执行。"""
+        import os
         import time
 
         start = time.time()
+        # 强制子进程按 UTF-8 输出，避免 Windows 下中文被 GBK 输出导致乱码
+        env = None
+        try:
+            env = dict(os.environ)
+            env["PYTHONIOENCODING"] = "utf-8"
+            env["PYTHONUTF8"] = "1"
+        except Exception:  # noqa: BLE001
+            env = None
         try:
             proc = subprocess.run(
                 cmd,
@@ -110,6 +119,7 @@ class Sandbox:
                 cwd=str(cwd) if cwd else None,
                 encoding="utf-8",
                 errors="replace",
+                env=env,
             )
             return RunResult(
                 returncode=proc.returncode,

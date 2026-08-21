@@ -10,8 +10,9 @@ from ..events import EventBus, EV_DONE, EV_FAIL, EV_LOG, EV_START
 from ..llm import LLMClient
 from ..sandbox import Sandbox
 from .code_agent import CodeAgent
-from .debug_agent import DebugAgent
+from .debug_agent import DebugAgent, parse_traceback
 from .doc_agent import DocAgent
+from .test_agent import TestAgent
 
 
 @dataclass
@@ -27,6 +28,8 @@ class PipelineResult:
     duration_s: float = 0.0
     error: str = ""
     final_output: str = ""
+    tests_passed: bool | None = None
+    tests_summary: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -41,6 +44,8 @@ class PipelineResult:
             "duration_s": round(self.duration_s, 2),
             "error": self.error,
             "final_output": self.final_output,
+            "tests_passed": self.tests_passed,
+            "tests_summary": self.tests_summary,
         }
 
 
@@ -55,16 +60,19 @@ class Coordinator:
         max_rounds: int | None = None,
         sandbox_timeout: float | None = None,
         keep_workspace: bool = False,
+        enable_tests: bool | None = None,
     ) -> None:
         self.llm = llm
         self.bus = bus or EventBus()
         self.max_rounds = max_rounds if max_rounds is not None else settings.max_fix_rounds
         self.sandbox = Sandbox(workspace=workspace, timeout=sandbox_timeout)
         self.keep_workspace = keep_workspace
+        self.enable_tests = enable_tests if enable_tests is not None else settings.auto_tests
 
         self.code_agent = CodeAgent(llm, self.bus)
         self.debug_agent = DebugAgent(llm, self.sandbox, self.bus, self.max_rounds)
         self.doc_agent = DocAgent(llm, self.bus)
+        self.test_agent = TestAgent(llm, self.sandbox, self.bus) if self.enable_tests else None
 
     def run(self, task: str, filename: str = "main.py") -> PipelineResult:
         """执行完整流水线，返回结果。"""
@@ -78,9 +86,10 @@ class Coordinator:
 
         self.sandbox.write_file(filename, code)
 
-        # 2. Debug 循环：运行 → 失败则修复，至多 max_rounds 轮
+        # 2. Debug 循环：运行 → 失败则修复（带历史记忆），至多 max_rounds 轮
         result = None
         rounds = 0
+        history: list[dict[str, Any]] = []  # 前几轮的失败诊断，供 DebugAgent 参考
         while rounds < self.max_rounds:
             rounds += 1
             result = self.sandbox.run_file(filename)
@@ -97,8 +106,16 @@ class Coordinator:
             )
             if result.ok:
                 break
-            # 运行失败 → 修复
-            code = self.debug_agent.fix(task, code, result, filename)
+            # 运行失败 → 修复（带上历史，避免重复踩坑）
+            code = self.debug_agent.fix(task, code, result, filename, history)
+            diag = parse_traceback(result.stderr)
+            history.append(
+                {
+                    "round": rounds,
+                    "error_type": diag["error_type"] or "",
+                    "message": (diag["message"] or (result.stderr or result.stdout))[:200],
+                }
+            )
 
         if result is None or not result.ok:
             err = f"经过 {rounds} 轮仍未能成功运行"
@@ -119,6 +136,14 @@ class Coordinator:
         readme = self.doc_agent.write_readme(task, code, result, filename)
         self.sandbox.write_file("README.md", readme)
 
+        # 4. Test Agent（可选）：自动生成测试并在沙箱中运行
+        tests_passed: bool | None = None
+        tests_summary = ""
+        if self.test_agent is not None:
+            test_info = self.test_agent.generate_tests(task, code, filename)
+            tests_passed = test_info.get("passed")
+            tests_summary = test_info.get("summary") or ""
+
         files = self.sandbox.list_files()
         if not self.keep_workspace:
             self.sandbox.cleanup()
@@ -127,7 +152,12 @@ class Coordinator:
             EV_DONE,
             agent="Coordinator",
             message=f"任务完成，共 {rounds} 轮运行通过",
-            data={"files": files, "duration_s": round(time.time() - start, 2)},
+            data={
+                "files": files,
+                "duration_s": round(time.time() - start, 2),
+                "tests_passed": tests_passed,
+                "tests_summary": tests_summary,
+            },
         )
         return PipelineResult(
             success=True,
@@ -140,6 +170,8 @@ class Coordinator:
             max_rounds=self.max_rounds,
             duration_s=time.time() - start,
             final_output=result.stdout or "",
+            tests_passed=tests_passed,
+            tests_summary=tests_summary,
         )
 
     def _fail(self, task: str, start: float, err: str) -> PipelineResult:

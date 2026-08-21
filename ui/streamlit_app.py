@@ -16,7 +16,7 @@ MAX_ROUNDS = st.sidebar.slider("最大修复轮次", 1, 6, 3)
 PROVIDER = st.sidebar.selectbox("LLM 提供方", ["deepseek", "fake"], index=0)
 
 st.title("🤖 多智能体代码助手（项目 I）")
-st.caption("Coordinator → Code Agent → Debug Agent(循环修复) → Doc Agent")
+st.caption("Coordinator → Code Agent → Debug Agent(循环修复) → Doc Agent → Test Agent")
 
 TASK = st.text_area(
     "任务描述",
@@ -30,6 +30,7 @@ KIND_EMOJI = {
     "run": "🏃",
     "fix": "🔧",
     "doc": "📄",
+    "test": "🧪",
     "done": "✅",
     "fail": "❌",
     "error": "💥",
@@ -82,6 +83,13 @@ def main() -> None:
                 elif kind == "doc" and data.get("readme"):
                     with container.expander("README.md"):
                         st.markdown(data["readme"])
+                elif kind == "test":
+                    status = "✅ 通过" if data.get("passed") else "⚠️ 未通过"
+                    with container.expander(f"Test Agent 测试：{status}"):
+                        if data.get("summary"):
+                            st.text(data["summary"])
+                        if data.get("output"):
+                            st.text(data["output"])
                 elif kind in ("done", "fail"):
                     container.success(message) if kind == "done" else container.error(message)
     except httpx.HTTPStatusError as e:

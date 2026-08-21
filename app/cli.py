@@ -11,7 +11,7 @@ import json
 import sys
 
 from .agents import Coordinator
-from .events import EV_CODE, EV_DOC, EV_FAIL, EV_FIX, EV_LOG, EV_RUN, EV_START
+from .events import EV_CODE, EV_DOC, EV_FAIL, EV_FIX, EV_LOG, EV_RUN, EV_START, EV_TEST
 from .llm import build_client
 
 
@@ -22,6 +22,7 @@ def _print_event(kind: str, message: str, data: dict) -> None:
         EV_RUN: "[运行]",
         EV_FIX: "[修复]",
         EV_DOC: "[文档]",
+        EV_TEST: "[测试]",
         EV_FAIL: "[失败]",
         EV_LOG: "[日志]",
     }.get(kind, f"[{kind}]")
@@ -40,6 +41,9 @@ def _print_event(kind: str, message: str, data: dict) -> None:
         print(data["code"])
     elif kind == EV_DOC and data.get("readme"):
         print(data["readme"])
+    elif kind == EV_TEST:
+        status = "✅ 通过" if data.get("passed") else "⚠️ 未通过"
+        print(f"  {status}  {data.get('summary', '')}")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -59,6 +63,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--provider", default=None, help="llm 提供方: deepseek / fake")
     parser.add_argument("--rounds", type=int, default=None, help="最大修复轮次")
+    parser.add_argument("--no-tests", action="store_true", help="不自动生成并运行测试")
     parser.add_argument("--json", action="store_true", help="输出 JSON 结果")
     parser.add_argument("--workspace", default=None, help="指定工作目录（默认临时）")
     parser.add_argument(
@@ -96,7 +101,18 @@ def main(argv: list[str] | None = None) -> int:
                 "输入 n，输出前 n 项斐波那契数列。\n\n"
                 "## 用法\n\n```bash\npython main.py 10\n```\n"
             )
-            llm = FakeClient(responses=[bad_code, good_code, readme])
+            test_code = (
+                "```python\n"
+                "import subprocess, sys, pathlib\n"
+                "def run(*a):\n"
+                "    return subprocess.run([sys.executable, 'main.py', *a], capture_output=True, text=True, cwd=pathlib.Path(__file__).parent)\n"
+                "def test_contains_fib21():\n"
+                "    assert '21' in run('8').stdout\n"
+                "def test_contains_zero():\n"
+                "    assert '0' in run('1').stdout\n"
+                "```"
+            )
+            llm = FakeClient(responses=[bad_code, good_code, readme, test_code])
             if args.task in ("", "demo"):
                 args.task = "写一个计算斐波那契数列前 N 项的程序"
         else:
@@ -110,6 +126,7 @@ def main(argv: list[str] | None = None) -> int:
         max_rounds=args.rounds,
         workspace=args.workspace,
         keep_workspace=bool(args.workspace),
+        enable_tests=not args.no_tests,
     )
 
     if not args.json:
