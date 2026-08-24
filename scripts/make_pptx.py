@@ -1,4 +1,4 @@
-"""生成答辩 PPT 的 .pptx 成品文件（深色科技风，7 页，含 AI 图案与多配色）。
+"""生成答辩 PPT 的 .pptx 成品文件（深色科技风，8 页，含 AI 图案与多配色）。
 
 运行：python scripts/make_pptx.py
 输出：output/slides/AI_Agent_Project_I_答辩.pptx
@@ -231,22 +231,22 @@ ln.fill.solid(); ln.fill.fore_color.rgb = ACCENT; ln.line.fill.background(); ln.
 # 神经网络背景（右上）
 neural_net(s, 10.2, 0.9, layers=(3, 5, 3), r=0.08, gap=0.38, label="Multi-Agent")
 # 机器人（左下）
-robot_face(s, 1.0, 5.2, d=1.5)
+robot_face(s, 0.75, 5.2, d=1.2)
 # 芯片（右下）
 chip(s, 11.5, 5.3, s=1.1, color=CYAN)
-# 大标题
-_textbox(s, 1.0, 2.1, 11.3, 1.3,
+# 大标题（收窄避免与右上 "Multi-Agent" 标签框重叠）
+_textbox(s, 1.0, 2.1, 8.9, 1.3,
          [("多智能体代码助手", {"size": 56, "bold": True, "color": WHITE, "align": PP_ALIGN.CENTER})])
 _textbox(s, 1.0, 3.45, 11.3, 0.6,
-         [("Coordinator + Code / Debug / Doc Agent 自动化流水线", {"size": 22, "color": CYAN, "align": PP_ALIGN.CENTER})])
+         [("Coordinator + Code / Debug / Doc / Test Agent 多智能体协作", {"size": 22, "color": CYAN, "align": PP_ALIGN.CENTER})])
 _textbox(s, 1.0, 4.15, 11.3, 0.5,
          [("2026 暑期 AI Agent 成长实践 · 项目 I", {"size": 16, "color": GRAY, "align": PP_ALIGN.CENTER})])
 # 底部标签
-tags = [("自动写代码", ACCENT), ("自动修 Bug", PINK), ("自动写文档", CYAN)]
+tags = [("自动写代码", ACCENT), ("自动修 Bug", PINK), ("自动写文档", CYAN), ("自动测试", ORANGE)]
 for i, (t, col) in enumerate(tags):
-    x = 2.9 + i * 3.0
-    _rect(s, x, 5.55, 2.4, 0.85, fill=BG2, line=col, line_w=Pt(2), radius=0.5)
-    _textbox(s, x, 5.7, 2.4, 0.55, [(t, {"size": 18, "bold": True, "color": col, "align": PP_ALIGN.CENTER})], anchor=MSO_ANCHOR.MIDDLE)
+    x = 2.2 + i * 2.35
+    _rect(s, x, 5.55, 2.15, 0.85, fill=BG2, line=col, line_w=Pt(2), radius=0.5)
+    _textbox(s, x, 5.7, 2.15, 0.55, [(t, {"size": 16, "bold": True, "color": col, "align": PP_ALIGN.CENTER})], anchor=MSO_ANCHOR.MIDDLE)
 _textbox(s, 1.0, 6.7, 11.3, 0.4, [("汇报人：小明", {"size": 14, "color": GRAY, "align": PP_ALIGN.CENTER})])
 s.notes_slide.notes_text_frame.text = "开场：老师们好，我的项目是多智能体代码助手，用 AI 自动完成写代码、运行、修Bug、写文档的整个闭环。"
 
@@ -287,24 +287,25 @@ _title_block(s, "系统架构：多智能体编排", "Coordinator 统一调度 �
 # Coordinator
 _rect(s, 4.4, 1.75, 4.5, 1.05, fill=ACCENT, radius=0.25)
 _textbox(s, 4.4, 2.0, 4.5, 0.6, [("Coordinator（总控编排）", {"size": 19, "bold": True, "color": BG, "align": PP_ALIGN.CENTER})], anchor=MSO_ANCHOR.MIDDLE)
-# 三个 Agent
+# 四个 Agent
 agents = [
     ("Code Agent", "生成代码", CYAN),
     ("Debug Agent", "运行 + 自动修复", PINK),
     ("Doc Agent", "生成 README", PURPLE),
+    ("Test Agent", "自动生成测试", ORANGE),
 ]
-ax = [1.1, 5.2, 9.4]
-aw, ah = 2.9, 1.8
+ax = [0.7, 3.75, 6.8, 9.85]
+aw, ah = 2.75, 1.8
 for (name, sub, col), x in zip(agents, ax):
     _rect(s, x, 4.0, aw, ah, fill=BG2, line=col, line_w=Pt(2))
-    _textbox(s, x, 4.3, aw, 0.6, [(name, {"size": 19, "bold": True, "color": WHITE, "align": PP_ALIGN.CENTER})])
-    _textbox(s, x, 4.95, aw, 0.5, [(sub, {"size": 14, "color": col, "align": PP_ALIGN.CENTER})])
+    _textbox(s, x, 4.3, aw, 0.6, [(name, {"size": 18, "bold": True, "color": WHITE, "align": PP_ALIGN.CENTER})])
+    _textbox(s, x, 4.95, aw, 0.5, [(sub, {"size": 13, "color": col, "align": PP_ALIGN.CENTER})])
 # 连线
-for cx in (2.55, 6.65, 10.85):
+for cx in (2.08, 5.13, 8.18, 11.23):
     _conn(s, 6.65, 2.8, cx, 4.0, color=RGBColor(110, 120, 170), width=Pt(1.5))
-# 事件流横条
+# 事件流横条 + 回环标注
 _rect(s, 0.8, 6.15, 11.7, 0.7, fill=BG3, line=CYAN, radius=0.3)
-_textbox(s, 0.8, 6.3, 11.7, 0.4, [("事件流 EventBus → CLI / SSE / Streamlit 实时展示", {"size": 16, "bold": True, "color": WHITE, "align": PP_ALIGN.CENTER})])
+_textbox(s, 0.8, 6.3, 11.7, 0.4, [("事件流 EventBus 实时展示 · Test→Debug 协作回环：测试失败 → Debug 修复 → 复测", {"size": 15, "bold": True, "color": WHITE, "align": PP_ALIGN.CENTER})])
 # 右上角芯片点缀
 chip(s, 12.1, 0.55, s=0.5, color=PURPLE)
 _footer(s, 3, "系统架构")
@@ -351,29 +352,77 @@ _footer(s, 5, "功能演示")
 s.notes_slide.notes_text_frame.text = "这里切到演示视频或现场demo，展示真实运行。"
 
 # ============================================================
-# 第 6 页：成果与数据（数字仪表盘 + 图表）
+# 第 6 页：多智能体协作与 Harness 架构（核心亮点页）
+# ============================================================
+s = _blank()
+bg_deco(s, 6)
+_title_block(s, "多智能体协作与 Harness 架构", "Harness 统一基础设施 · Test→Debug 协作回环")
+
+# 左：Harness 基础设施层容器
+_rect(s, 0.8, 1.8, 5.6, 4.3, fill=BG2, line=CYAN, line_w=Pt(2), radius=0.15)
+_textbox(s, 1.05, 1.95, 5.1, 0.5, [("Harness 基础设施层", {"size": 20, "bold": True, "color": CYAN})])
+boxes = [
+    ("沙箱隔离", "subprocess + 临时目录 + 超时", (1.05, 2.6), ACCENT),
+    ("事件总线", "EventBus 实时事件流", (3.65, 2.6), PURPLE),
+    ("工具注册", "ToolRegistry 沙箱能力", (1.05, 4.05), ORANGE),
+    ("全局配置", "Key / 轮次 / 超时", (3.65, 4.05), PINK),
+]
+for name, sub, (bx, by), col in boxes:
+    _rect(s, bx, by, 2.5, 1.3, fill=BG3, line=col, line_w=Pt(1.5))
+    _textbox(s, bx + 0.15, by + 0.12, 2.2, 0.4, [(name, {"size": 15, "bold": True, "color": col})])
+    _textbox(s, bx + 0.15, by + 0.6, 2.2, 0.62, [(sub, {"size": 11, "color": GRAY, "line_spacing": 1.1})])
+_textbox(s, 1.05, 5.45, 5.1, 0.3, [("Agent 不再各自建资源，统一从 Harness 获取", {"size": 11, "color": GRAY})])
+
+# 右：Test→Debug 协作回环
+_rect(s, 6.9, 1.8, 5.65, 4.3, fill=BG2, line=ORANGE, line_w=Pt(2), radius=0.15)
+_textbox(s, 7.15, 1.95, 5.1, 0.5, [("Test→Debug 协作回环", {"size": 20, "bold": True, "color": ORANGE})])
+# 两个节点
+_rect(s, 7.2, 2.9, 2.2, 1.0, fill=BG3, line=CYAN, line_w=Pt(1.5))
+_textbox(s, 7.2, 3.05, 2.2, 0.45, [("Test Agent", {"size": 16, "bold": True, "color": WHITE, "align": PP_ALIGN.CENTER})])
+_textbox(s, 7.2, 3.52, 2.2, 0.35, [("生成测试并运行", {"size": 11, "color": GRAY, "align": PP_ALIGN.CENTER})])
+_rect(s, 10.0, 2.9, 2.2, 1.0, fill=BG3, line=PINK, line_w=Pt(1.5))
+_textbox(s, 10.0, 3.05, 2.2, 0.45, [("Debug Agent", {"size": 16, "bold": True, "color": WHITE, "align": PP_ALIGN.CENTER})])
+_textbox(s, 10.0, 3.52, 2.2, 0.35, [("按测试输出修复", {"size": 11, "color": GRAY, "align": PP_ALIGN.CENTER})])
+# 上行：协作消息
+_textbox(s, 7.15, 2.45, 5.3, 0.35, [("🔁 协作消息（EV_MSG）", {"size": 12, "color": CYAN, "align": PP_ALIGN.CENTER})])
+_shape(s, MSO_SHAPE.RIGHT_ARROW, 9.4, 3.28, 0.6, 0.28, fill=CYAN)
+# 下行：复测
+_shape(s, MSO_SHAPE.LEFT_ARROW, 9.4, 3.95, 0.6, 0.28, fill=PINK)
+_textbox(s, 7.15, 4.35, 5.3, 0.35, [("复用同一份测试复测", {"size": 12, "color": PINK, "align": PP_ALIGN.CENTER})])
+# 循环结论
+_textbox(s, 7.15, 5.3, 5.15, 0.8, [("一个 Agent 发现问题，另一个 Agent 解决，", {"size": 13, "color": WHITE}),
+                                     ("直至测试通过或达到最大回环轮次", {"size": 13, "color": WHITE})])
+# 底部协作横幅
+_rect(s, 0.8, 6.35, 11.75, 0.55, fill=BG3, line=YELLOW, radius=0.3)
+_textbox(s, 0.8, 6.45, 11.75, 0.4, [("多智能体 ≠ 流水线：Test 发现 Bug → 协作消息 → Debug 修复 → 复测通过", {"size": 15, "bold": True, "color": YELLOW, "align": PP_ALIGN.CENTER})])
+chip(s, 12.6, 0.55, s=0.5, color=CYAN)
+_footer(s, 6, "多智能体协作与 Harness")
+s.notes_slide.notes_text_frame.text = "这是本项目最核心的亮点：Test Agent 测试失败时，通过协作消息反馈给 Debug Agent，Debug 修复后复用同一份测试复测，形成真实的跨 Agent 协作闭环——这正是『多智能体』而非『单 Agent 流水线』的关键证据。"
+
+# ============================================================
+# 第 7 页：成果与数据（数字仪表盘 + 图表）
 # ============================================================
 s = _blank()
 bg_deco(s, 6)
 _title_block(s, "成果与数据", "用数据证明项目可用")
 stats = [
-    ("15", "pytest 测试全部通过", CYAN),
-    ("7.5s", "端到端真实运行耗时", ACCENT),
+    ("25", "pytest 测试全部通过", CYAN),
+    ("10/10", "Benchmark 任务结果正确", ACCENT),
+    ("9/10", "自动测试通过率", PINK),
     ("100%", "CI 全绿，推送自动验证", PURPLE),
-    ("v1.0.0", "GitHub Release 已发布", ORANGE),
 ]
 for (num, label, col), (x, y) in zip(stats, [(0.8, 1.9), (6.9, 1.9), (0.8, 4.6), (6.9, 4.6)]):
     h = 1.9 if y > 4.0 else 2.5  # 底部一排收缩，避免压到底部规范条
     _rect(s, x, y, 5.6, h, fill=BG2, line=col, line_w=Pt(2))
-    _textbox(s, x + 0.3, y + 0.3, 5.0, 1.1, [(num, {"size": 50, "bold": True, "color": col})])
+    _textbox(s, x + 0.3, y + 0.3, 5.0, 0.9, [(num, {"size": 50, "bold": True, "color": col})])
     _textbox(s, x + 0.3, y + 1.2, 5.0, 0.6, [(label, {"size": 16, "color": WHITE})])
 # 底部工程规范条
 _rect(s, 0.8, 6.55, 11.7, 0.55, fill=BG3, line=YELLOW, radius=0.3)
 _textbox(s, 0.8, 6.65, 11.7, 0.4, [("工程规范：MIT License · CONTRIBUTING 贡献指南 · 三种入口全部实测可用", {"size": 15, "color": WHITE, "align": PP_ALIGN.CENTER})])
 # 右下角芯片点缀
 chip(s, 12.6, 6.6, s=0.5, color=PINK)
-_footer(s, 6, "成果与数据")
-s.notes_slide.notes_text_frame.text = "用数据说话，展示仓库地址和CI截图。"
+_footer(s, 7, "成果与数据")
+s.notes_slide.notes_text_frame.text = "用数据说话：25 个测试全过、Benchmark 10 个任务结果全对、CI 全绿，展示仓库地址和 CI 截图。"
 
 # ============================================================
 # 第 7 页：总结与展望 + 致谢
@@ -382,9 +431,9 @@ s = _blank()
 bg_deco(s, 7)
 _title_block(s, "总结与展望", "一路收获，继续前行")
 cols = [
-    ("收获", ["多Agent 编排与事件驱动", "沙箱隔离 / LLM 抽象", "完整工程化交付经验"], CYAN),
-    ("不足", ["仅支持单文件 Python", "修复质量依赖 LLM 能力", "缺少系统 Benchmark 统计"], ORANGE),
-    ("展望", ["支持多文件与依赖安装", "新增测试生成 Agent", "建立成功率量化评估"], ACCENT),
+    ("收获", ["多Agent 编排与协作回环", "Harness 基础设施层", "Benchmark 量化 10/10"], CYAN),
+    ("不足", ["仅支持单文件 Python", "修复质量依赖 LLM 能力", "实时通信用 SSE 未上 WebSocket"], ORANGE),
+    ("展望", ["WebSocket 实时双向推送", "支持多文件与依赖安装", "完整 tool-calling 工具调用"], ACCENT),
 ]
 for (t, lines, col), x in zip(cols, [0.8, 4.8, 8.8]):
     _card(s, x, 1.9, 3.7, 3.5, t, lines, title_size=20, body_size=15, accent=col)
@@ -394,7 +443,7 @@ _textbox(s, 0.8, 6.1, 11.7, 0.6, [("感谢聆听，敬请指正！", {"size": 26
 # 机器人（右上角）+ 芯片（右侧边）
 robot_face(s, 11.9, 0.5, d=0.85)
 chip(s, 12.6, 3.0, s=0.5, color=PURPLE)
-_footer(s, 7, "总结与展望")
+_footer(s, 8, "总结与展望")
 s.notes_slide.notes_text_frame.text = "收尾：感谢老师，欢迎提问。"
 
 out = "output/slides/AI_Agent_Project_I_答辩.pptx"
