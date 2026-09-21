@@ -40,6 +40,10 @@ class Settings:
     max_test_rounds: int = field(
         default_factory=lambda: int(os.getenv("MAX_TEST_ROUNDS", "2"))
     )
+    # 默认生成语言（python / c / cpp / go / java）
+    default_language: str = field(
+        default_factory=lambda: os.getenv("DEFAULT_LANGUAGE", "python")
+    )
 
 
 settings = Settings()

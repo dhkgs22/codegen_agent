@@ -2,7 +2,10 @@
 
 示例：
     python -m app.cli "写一个计算斐波那契数列前 N 项的程序"
-    python -m app.cli --provider fake --rounds 2 "写一个 hello world"
+    python -m app.cli --lang c "写一个判断素数的程序"        # 生成 C 代码
+    python -m app.cli --lang java --rounds 4 "实现一个栈"     # 生成 Java 代码
+    python -m app.cli --list-langs                           # 查看支持的语言与本机工具链
+    python -m app.cli --provider fake --demo                  # 演示模式，不消耗 token
 """
 from __future__ import annotations
 
@@ -12,6 +15,13 @@ import sys
 
 from .agents import Coordinator
 from .events import EV_CODE, EV_DOC, EV_FAIL, EV_FIX, EV_LOG, EV_MSG, EV_RUN, EV_START, EV_TEST
+from .languages import (
+    DEFAULT_LANGUAGE,
+    UnknownLanguageError,
+    language_keys,
+    resolve_language,
+    toolchain_status,
+)
 from .llm import build_client
 
 
@@ -29,7 +39,9 @@ def _print_event(kind: str, message: str, data: dict) -> None:
     }.get(kind, f"[{kind}]")
     print(f"\n{tag} {message}")
     if kind == EV_CODE and data.get("code"):
-        print("```python")
+        # 按实际语言渲染代码块（C / C++ / Go / Java / Python）
+        fence = data.get("fence", "python")
+        print(f"```{fence}")
         print(data["code"])
         print("```")
     elif kind == EV_RUN:
@@ -45,8 +57,30 @@ def _print_event(kind: str, message: str, data: dict) -> None:
     elif kind == EV_TEST:
         status = "✅ 通过" if data.get("passed") else "⚠️ 未通过"
         print(f"  {status}  {data.get('summary', '')}")
+        # 测试未通过时把每条用例的结果打出来，否则只看得到一句汇总，没法排查
+        if not data.get("passed") and data.get("output"):
+            for line in str(data["output"]).splitlines():
+                print(f"    {line}")
     elif kind == EV_MSG:
         print(f"  🔁 {message}")
+
+
+def _print_languages() -> int:
+    """打印支持的语言与本机工具链可用性。"""
+    print(f"默认语言：{DEFAULT_LANGUAGE}\n")
+    print(f"{'key':<8} {'语言':<8} {'入口文件':<12} {'自动测试':<10} {'本机工具链'}")
+    print("-" * 62)
+    for row in toolchain_status():
+        if row["available"]:
+            tool = "✅ 可用"
+        else:
+            tool = f"❌ 缺少 {', '.join(row['missing'])}"
+        print(
+            f"{row['key']:<8} {row['display']:<8} {row['entry']:<12} "
+            f"{row['test_strategy']:<10} {tool}"
+        )
+    print("\n用法：python -m app.cli --lang <key> \"任务描述\"")
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -66,15 +100,37 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--provider", default=None, help="llm 提供方: deepseek / fake")
     parser.add_argument("--rounds", type=int, default=None, help="最大修复轮次")
+    parser.add_argument(
+        "--lang",
+        default=DEFAULT_LANGUAGE,
+        help=f"目标语言：{' / '.join(language_keys())}（默认 {DEFAULT_LANGUAGE}）",
+    )
     parser.add_argument("--no-tests", action="store_true", help="不自动生成并运行测试")
     parser.add_argument("--json", action="store_true", help="输出 JSON 结果")
     parser.add_argument("--workspace", default=None, help="指定工作目录（默认临时）")
+    parser.add_argument(
+        "--list-langs", action="store_true", help="列出支持的语言与本机工具链状态后退出"
+    )
     parser.add_argument(
         "--demo",
         action="store_true",
         help="演示模式：用脚本化响应跑通完整流程（不消耗 token）",
     )
     args = parser.parse_args(argv)
+
+    if args.list_langs:
+        return _print_languages()
+
+    try:
+        lang = resolve_language(args.lang)
+    except UnknownLanguageError as e:
+        print(f"错误：{e}", file=sys.stderr)
+        return 2
+
+    # --demo 的脚本化响应是写死的 Python，指定其它语言时忽略
+    if args.demo and lang.key != "python":
+        print(f"提示：--demo 演示脚本是 Python 的，已忽略 --lang {args.lang}。", file=sys.stderr)
+        lang = resolve_language("python")
 
     try:
         if args.demo:
@@ -130,6 +186,7 @@ def main(argv: list[str] | None = None) -> int:
         workspace=args.workspace,
         keep_workspace=bool(args.workspace),
         enable_tests=not args.no_tests,
+        language=lang,
     )
 
     if not args.json:
@@ -145,7 +202,10 @@ def main(argv: list[str] | None = None) -> int:
 
     print("\n" + "=" * 50)
     if result.success:
-        print(f"✅ 成功！用了 {result.rounds_used} 轮，耗时 {result.duration_s:.1f}s")
+        print(
+            f"✅ 成功！语言 {result.language_display}，用了 {result.rounds_used} 轮，"
+            f"耗时 {result.duration_s:.1f}s"
+        )
         print(f"产出文件：{result.files}")
         print(f"最终输出：{result.final_output[:500]}")
     else:

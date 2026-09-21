@@ -24,6 +24,10 @@ Doc / Test 四个 Agent。
 │   │ ToolRegistry │   │    Settings      │    │
 │   │ 工具注册表    │   │  API Key/轮次/超时 │   │
 │   └──────────────┘   └──────────────────┘    │
+│   ┌──────────────────────────────────────┐   │
+│   │ Language Registry（app/languages.py） │   │
+│   │ 编译/运行命令·报错解析·提示词·测试策略  │   │
+│   └──────────────────────────────────────┘   │
 └─────────────────────────────────────────────┘
           ▲            ▲           ▲
           │            │           │
@@ -31,12 +35,14 @@ Doc / Test 四个 Agent。
 ```
 
 - **Sandbox**：subprocess + 临时目录 + 超时保护，强制子进程 UTF-8 输出，
-  保证 LLM 生成的任意代码都在隔离环境里安全运行。
+  保证 LLM 生成的任意代码都在隔离环境里安全运行。支持多语言：按文件后缀取语言档案，
+  编译型语言先编译（产物按内容 hash 缓存）再运行，编译失败与运行失败分开诊断。
 - **EventBus**：所有 Agent 通过 `emit` 发布事件（start/code/run/fix/doc/test/msg/done），
   CLI、SSE、Streamlit 实时渲染，让「协作过程可见」。
-- **ToolRegistry**：把沙箱能力注册成可调用工具——`run_python`、`read_file`、
-  `write_file`、`list_files`。新增工具只需 `register(name, fn, description)`。
-- **Settings**：API Key、超时、最大修复轮次等全局配置统一入口。
+- **ToolRegistry**：把沙箱能力注册成可调用工具——`run_file`（按后缀自动识别语言）、
+  `build_file`、`read_file`、`write_file`、`list_files`、`list_languages`。
+  新增工具只需 `register(name, fn, description)`。
+- **Settings**：API Key、超时、最大修复轮次、默认语言等全局配置统一入口。
 
 ## Agent 如何接入 Harness
 
